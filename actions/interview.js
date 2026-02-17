@@ -4,12 +4,21 @@ import { db } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Initialize AI only if API key exists
+let genAI, model;
+if (process.env.GEMINI_API_KEY) {
+  genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+}
 
 export async function generateQuiz() {
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
+
+  // Check if AI is available
+  if (!model) {
+    throw new Error("AI service is currently unavailable. Please check your API configuration");
+  }
 
   const user = await db.user.findUnique({
     where: { clerkUserId: userId },
@@ -22,11 +31,9 @@ export async function generateQuiz() {
   if (!user) throw new Error("User not found");
 
   const prompt = `
-    Generate 10 technical interview questions for a ${
-      user.industry
-    } professional${
-    user.skills?.length ? ` with expertise in ${user.skills.join(", ")}` : ""
-  }.
+    Generate 10 technical interview questions for a ${user.industry
+    } professional${user.skills?.length ? ` with expertise in ${user.skills.join(", ")}` : ""
+    }.
     
     Each question should be multiple choice with 4 options.
     
@@ -103,7 +110,6 @@ export async function saveQuizResult(questions, answers, score) {
       const tipResult = await model.generateContent(improvementPrompt);
 
       improvementTip = tipResult.response.text().trim();
-      console.log(improvementTip);
     } catch (error) {
       console.error("Error generating improvement tip:", error);
       // Continue without improvement tip if generation fails

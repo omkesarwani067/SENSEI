@@ -4,12 +4,21 @@ import { db } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Initialize AI only if API key exists
+let genAI, model;
+if (process.env.GEMINI_API_KEY) {
+  genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+}
 
 export async function generateCoverLetter(data) {
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
+
+  // Check if AI is available
+  if (!model) {
+    throw new Error("AI service is currently unavailable. Please check your API configuration");
+  }
 
   const user = await db.user.findUnique({
     where: { clerkUserId: userId },
@@ -18,9 +27,8 @@ export async function generateCoverLetter(data) {
   if (!user) throw new Error("User not found");
 
   const prompt = `
-    Write a professional cover letter for a ${data.jobTitle} position at ${
-    data.companyName
-  }.
+    Write a professional cover letter for a ${data.jobTitle} position at ${data.companyName
+    }.
     
     About the candidate:
     - Industry: ${user.industry}

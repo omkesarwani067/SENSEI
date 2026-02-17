@@ -10,6 +10,7 @@ import {
   Loader2,
   Monitor,
   Save,
+  Sparkles, 
 } from "lucide-react";
 import { toast } from "sonner";
 import MDEditor from "@uiw/react-md-editor";
@@ -17,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { saveResume } from "@/actions/resume";
+import { saveResume, improveWithAI } from "@/actions/resume";
 import { EntryForm } from "./entry-form";
 import useFetch from "@/hooks/user-fetch";
 import { useUser } from "@clerk/nextjs";
@@ -25,212 +26,9 @@ import { entriesToMarkdown } from "@/app/lib/helper";
 import { resumeSchema } from "@/app/lib/schema";
 
 // React-PDF imports
-import { 
-  Document, 
-  Page, 
-  Text, 
-  View, 
-  StyleSheet, 
-  PDFDownloadLink, 
-  pdf,
-  Font 
-} from '@react-pdf/renderer';
+import { PDFDownloadLink, pdf } from '@react-pdf/renderer';
+import { ResumePDF } from './resume-pdf';
 
-// ✅ FIXED: Use system fonts (no external loading required)
-// This prevents "unknown font format" errors
-const pdfStyles = StyleSheet.create({
-  page: {
-    flexDirection: 'column',
-    backgroundColor: '#ffffff',
-    padding: 40,
-    fontFamily: 'Helvetica', // System font - always works
-    fontSize: 11,
-    lineHeight: 1.5,
-    color: '#333333',
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: 25,
-    paddingBottom: 15,
-    borderBottom: '2 solid #2563eb',
-  },
-  name: {
-    fontSize: 28,
-    fontFamily: 'Helvetica-Bold', // Bold system font
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  contactContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: 15,
-  },
-  contactItem: {
-    fontSize: 10,
-    color: '#64748b',
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: 'Helvetica-Bold',
-    color: '#1e293b',
-    marginBottom: 10,
-    paddingBottom: 4,
-    borderBottom: '1 solid #e2e8f0',
-  },
-  paragraph: {
-    fontSize: 11,
-    marginBottom: 8,
-    textAlign: 'justify',
-    lineHeight: 1.6,
-  },
-  experienceItem: {
-    marginBottom: 16,
-  },
-  jobTitle: {
-    fontSize: 13,
-    fontFamily: 'Helvetica-Bold',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  companyInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  company: {
-    fontSize: 11,
-    color: '#2563eb',
-    fontFamily: 'Helvetica-Oblique', // Italic system font
-  },
-  duration: {
-    fontSize: 10,
-    color: '#64748b',
-    fontFamily: 'Helvetica-Oblique',
-  },
-  description: {
-    fontSize: 10,
-    color: '#475569',
-    lineHeight: 1.5,
-    marginTop: 4,
-  },
-  skillsText: {
-    fontSize: 11,
-    lineHeight: 1.6,
-  },
-});
-
-// ✅ PDF Document Component
-const ResumePDF = ({ resumeData, user }) => {
-  const formatContactInfo = () => {
-    const contacts = [];
-    if (resumeData.contactInfo?.email) contacts.push(`📧 ${resumeData.contactInfo.email}`);
-    if (resumeData.contactInfo?.mobile) contacts.push(`📱 ${resumeData.contactInfo.mobile}`);
-    if (resumeData.contactInfo?.linkedin) contacts.push(`💼 LinkedIn`);
-    if (resumeData.contactInfo?.twitter) contacts.push(`🐦 Twitter`);
-    return contacts;
-  };
-
-  return (
-    <Document>
-      <Page size="A4" style={pdfStyles.page}>
-        {/* Header Section */}
-        <View style={pdfStyles.header}>
-          <Text style={pdfStyles.name}>{user?.fullName || 'Your Name'}</Text>
-          <View style={pdfStyles.contactContainer}>
-            {formatContactInfo().map((contact, index) => (
-              <Text key={index} style={pdfStyles.contactItem}>
-                {contact}
-              </Text>
-            ))}
-          </View>
-        </View>
-
-        {/* Professional Summary */}
-        {resumeData.summary && (
-          <View style={pdfStyles.section}>
-            <Text style={pdfStyles.sectionTitle}>Professional Summary</Text>
-            <Text style={pdfStyles.paragraph}>{resumeData.summary}</Text>
-          </View>
-        )}
-
-        {/* Skills */}
-        {resumeData.skills && (
-          <View style={pdfStyles.section}>
-            <Text style={pdfStyles.sectionTitle}>Skills</Text>
-            <Text style={pdfStyles.skillsText}>{resumeData.skills}</Text>
-          </View>
-        )}
-
-        {/* Work Experience */}
-        {resumeData.experience?.length > 0 && (
-          <View style={pdfStyles.section}>
-            <Text style={pdfStyles.sectionTitle}>Work Experience</Text>
-            {resumeData.experience.map((exp, index) => (
-              <View key={index} style={pdfStyles.experienceItem}>
-                <Text style={pdfStyles.jobTitle}>{exp.title || 'Job Title'}</Text>
-                <View style={pdfStyles.companyInfo}>
-                  <Text style={pdfStyles.company}>{exp.company || 'Company Name'}</Text>
-                  {exp.duration && (
-                    <Text style={pdfStyles.duration}>{exp.duration}</Text>
-                  )}
-                </View>
-                {exp.description && (
-                  <Text style={pdfStyles.description}>{exp.description}</Text>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Education */}
-        {resumeData.education?.length > 0 && (
-          <View style={pdfStyles.section}>
-            <Text style={pdfStyles.sectionTitle}>Education</Text>
-            {resumeData.education.map((edu, index) => (
-              <View key={index} style={pdfStyles.experienceItem}>
-                <Text style={pdfStyles.jobTitle}>{edu.degree || edu.title}</Text>
-                <View style={pdfStyles.companyInfo}>
-                  <Text style={pdfStyles.company}>{edu.institution || edu.company}</Text>
-                  {edu.duration && (
-                    <Text style={pdfStyles.duration}>{edu.duration}</Text>
-                  )}
-                </View>
-                {edu.description && (
-                  <Text style={pdfStyles.description}>{edu.description}</Text>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Projects */}
-        {resumeData.projects?.length > 0 && (
-          <View style={pdfStyles.section}>
-            <Text style={pdfStyles.sectionTitle}>Projects</Text>
-            {resumeData.projects.map((project, index) => (
-              <View key={index} style={pdfStyles.experienceItem}>
-                <Text style={pdfStyles.jobTitle}>{project.title}</Text>
-                {project.duration && (
-                  <Text style={pdfStyles.duration}>{project.duration}</Text>
-                )}
-                {project.description && (
-                  <Text style={pdfStyles.description}>{project.description}</Text>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-      </Page>
-    </Document>
-  );
-};
-
-// ✅ Main Resume Builder Component
 export default function ResumeBuilder({ initialContent = "" }) {
   const [activeTab, setActiveTab] = useState("edit");
   const [previewContent, setPreviewContent] = useState(initialContent);
@@ -329,29 +127,46 @@ export default function ResumeBuilder({ initialContent = "" }) {
     }
   }, [saveError]);
 
-  // ✅ FIXED: PDF Generation with better error handling
+  // Updated PDF Generation function
   const generatePDF = async () => {
     setIsGenerating(true);
     try {
-      console.log("Starting PDF generation...");
+      // Validate that we have content to generate
+      if (!formValues || Object.keys(formValues).length === 0) {
+        toast.error("No resume data to generate PDF");
+        setIsGenerating(false);
+        return;
+      }
+
+      console.log("Generating PDF with data:", formValues);
       
+      // Create the PDF document
       const doc = <ResumePDF resumeData={formValues} user={user} />;
       const asPdf = pdf(doc);
       const blob = await asPdf.toBlob();
       
-      console.log("PDF blob created successfully");
+      console.log("PDF generated successfully, size:", blob.size);
       
-      // Create download link
+      // Generate filename with date
+      const fileName = `${user?.fullName?.replace(/\s+/g, '_') || 'resume'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      
+      // Create and trigger download
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${user?.fullName?.replace(/\s+/g, '_') || 'resume'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      link.download = fileName;
+      link.style.display = 'none';
+      
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
       
-      toast.success("PDF generated and downloaded successfully!");
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
+      
+      toast.success("Resume PDF downloaded successfully!");
     } catch (error) {
       console.error('PDF generation error:', error);
       toast.error(`Failed to generate PDF: ${error.message}`);
@@ -419,26 +234,7 @@ export default function ResumeBuilder({ initialContent = "" }) {
               </>
             )}
           </Button>
-          
-          {/* ✅ FIXED: Direct PDF Download Button */}
-          <Button 
-            onClick={generatePDF} 
-            disabled={isGenerating || !previewContent?.trim()}
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Download className="mr-2 h-4 w-4" />
-                Download PDF
-              </>
-            )}
-          </Button>
-
-          {/* ✅ FIXED: Alternative PDFDownloadLink */}
+           {/* Alternative PDFDownloadLink */}
           <PDFDownloadLink
             document={<ResumePDF resumeData={formValues} user={user} />}
             fileName={`${user?.fullName?.replace(/\s+/g, '_') || 'resume'}_${new Date().toISOString().split('T')[0]}.pdf`}
@@ -550,6 +346,7 @@ export default function ResumeBuilder({ initialContent = "" }) {
                     className="min-h-32"
                     placeholder="Write a compelling professional summary..."
                   />
+                  
                 )}
               />
               {errors.summary && (

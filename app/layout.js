@@ -1,6 +1,6 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ClerkProvider}from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
 import Header from "@/components/ui/header";
 import { ThemeProvider } from "@/components/ui/theme-provider";
@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
   title: "AI Career Coach",
-  description: "",
+  description: "Your AI-powered career coach for resume building, interview preparation, and cover letter generation",
 };
 
 export default function RootLayout({ children }) {
@@ -31,7 +31,7 @@ export default function RootLayout({ children }) {
             enableSystem
             disableTransitionOnChange
           >
-            <Header/>
+            <Header />
             <main className="min-h-screen">{children}</main>
             <Toaster richColors />
 
